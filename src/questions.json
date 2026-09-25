@@ -1,0 +1,50 @@
+{
+  "primary_catalyst": {
+    "type": "choice",
+    "instructions": "What is the primary reported catalyst for the decline in `ticker` today, based only on `market_context`, `sector_context`, and `evidence`?",
+    "criteria": {
+      "sector_sympathy": "The decline is mainly attributable to weakness in related companies, the industry, or sector.",
+      "analyst_downgrade": "The primary catalyst is an analyst downgrade, price-target cut, or materially negative analyst note.",
+      "broad_risk_off": "The decline is mainly attributable to broad market, macroeconomic, or cross-asset risk-off behavior.",
+      "minor_company_news": "Company-specific news is negative but does not clearly imply material deterioration in the underlying business.",
+      "earnings_or_guidance": "The decline is primarily connected to reported earnings or management guidance.",
+      "dilutive_offering": "The company announced, filed for, or is pursuing an equity offering or another materially dilutive capital raise.",
+      "fraud_or_regulatory": "The decline involves fraud allegations/findings, serious SEC/regulatory action, or comparable misconduct.",
+      "bankruptcy_or_delisting": "The decline involves bankruptcy, insolvency, severe financial distress, or delisting risk.",
+      "other_company_specific": "The catalyst is company-specific but does not cleanly fit another category.",
+      "unclear": "The supplied evidence does not establish a clear primary catalyst."
+    }
+  },
+  "evidence_sufficient": {
+    "type": "noul",
+    "instructions": "Do `market_context`, `sector_context`, and `evidence` contain enough reliable information to identify the main reason for today's decline?"
+  },
+  "fraud_regulatory_risk": {
+    "type": "noul",
+    "instructions": "Does `evidence` indicate fraud, serious SEC/regulatory action, or comparable misconduct?"
+  },
+  "bankruptcy_delisting_risk": {
+    "type": "noul",
+    "instructions": "Does `evidence` indicate bankruptcy, insolvency, severe financial distress, or delisting risk?"
+  },
+  "dilutive_offering": {
+    "type": "noul",
+    "instructions": "Does `evidence` indicate a new equity offering or another materially dilutive capital raise?"
+  },
+  "sector_sympathy": {
+    "type": "noul",
+    "instructions": "Do `sector_context` and `evidence` indicate that sector, industry, or peer weakness is a major cause of this stock's decline?"
+  },
+  "single_analyst_downgrade": {
+    "type": "noul",
+    "instructions": "Does `evidence` indicate that a single analyst downgrade, price-target reduction, or analyst note is a major cause of the decline?"
+  },
+  "broad_risk_off": {
+    "type": "noul",
+    "instructions": "Do `market_context` and `evidence` indicate that broad market or macroeconomic risk-off behavior is a major cause of the decline?"
+  },
+  "minor_news_overreaction": {
+    "type": "noul",
+    "instructions": "Does `evidence` support that the decline is primarily a reaction to relatively minor company-specific news rather than clearly material deterioration of the business?"
+  }
+}

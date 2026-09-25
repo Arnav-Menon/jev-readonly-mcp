@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: jev-readonly-mcp
+    runtime: docker
+    plan: starter
+    numInstances: 1
+    healthCheckPath: /health
+    envVars:
+      - key: TYPESAFE_API_KEY
+        sync: false
+      - key: HOST
+        value: 0.0.0.0

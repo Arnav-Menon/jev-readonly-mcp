@@ -1,0 +1,17 @@
+{
+  "name": "jev-readonly-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20.19.0" },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test",
+    "smoke": "node scripts/smoke.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.1",
+    "express": "5.2.1",
+    "zod": "4.6.5"
+  }
+}
