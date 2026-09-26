@@ -80,9 +80,9 @@ npm run smoke
 
 Or `node --env-file=.env scripts/smoke.js`. This uses synthetic evidence and prints only success, the model name, and answer count. It neither fetches market data nor touches Robinhood.
 
-## Deploy to Render
+## Deploy to Vercel
 
-The Docker image has also been built and tested locally, including all nine automated tests and a live Jev call through its published HTTP port. To repeat the offline container tests from this directory:
+The existing Docker image remains useful for local validation. To repeat the offline container tests from this directory:
 
 ```sh
 docker build -t jev-readonly-mcp:local-test .
@@ -97,32 +97,33 @@ docker run --rm --publish 127.0.0.1:3000:3000 --env TYPESAFE_API_KEY jev-readonl
 
 Check `http://127.0.0.1:3000/health` from another terminal. The process runs as the non-root `node` user. See `VALIDATION.md` for the completed checks.
 
-This project is prepared for deployment but is not already hosted. No public URL has been created.
+The service is an Express app detected by Vercel and runs as an on-demand Function. `vercel.json` sets a 60-second per-request ceiling. Each call to `jev_classify` makes one TypeSafe request with a 20-second application timeout. A shadow workflow that runs for more than 15 minutes is still fine if it makes separate MCP calls; the MCP service does not need to stay running for the entire workflow. There is no server process to keep awake, and periodic dummy requests do not guarantee warm capacity. Do not add a keep-alive cron.
 
-1. Put the contents of this directory at the root of a Git repository, including `package-lock.json`, `Dockerfile`, and `render.yaml`. Exclude `.env`, `.secrets`, and `node_modules`. Connect that repository to Render.
-2. In the Render dashboard, create a **Blueprint** from the repository and select `render.yaml`.
-3. Review the proposed service. The Blueprint uses **one Starter instance**, which is a paid service. Review the current price before creating it.
-4. At the secret prompt, enter your existing TypeSafe key as **`TYPESAFE_API_KEY`**. The Blueprint uses `sync: false`: the value belongs in Render's environment settings, never in YAML or Git. For an existing service, add or rotate the key manually under **Environment**, then redeploy.
-5. Deploy. Render builds the Dockerfile, supplies `PORT`, and routes HTTPS traffic to it. `HOST=0.0.0.0` permits cloud ingress. The service automatically allows Render's `RENDER_EXTERNAL_HOSTNAME`.
-6. Copy the actual public service URL from Render. Open `https://YOUR-ACTUAL-SERVICE.onrender.com/health`; expect `{"status":"ok"}`.
-7. The MCP URL is **`https://YOUR-ACTUAL-SERVICE.onrender.com/mcp`**. Replace the example hostname with the one Render assigned; do not paste a Markdown link into the URL field.
+This checkout is prepared for Vercel, but no public deployment has been created yet.
 
-For a custom domain or another host, set `ALLOWED_HOSTS` to a comma-separated list of exact hostnames, without schemes, ports, paths, or wildcards. Set `HOST=0.0.0.0`, inject `TYPESAFE_API_KEY` at runtime, and terminate HTTPS at the hosting proxy. Do not set `TYPESAFE_ENDPOINT`: the only outbound inference endpoint is hard-coded to TypeSafe, and redirects are refused.
+1. Open the Vercel dashboard and choose **Add New → Project**. Import the GitHub repository **`Arnav-Menon/jev-readonly-mcp`**. If Vercel asks for a Root Directory, leave it at the repository root.
+2. In project settings, add **`TYPESAFE_API_KEY`** as an encrypted environment variable for **Production** (and Preview only if you intend to test previews). Paste the existing TypeSafe key directly into Vercel's secret field. Never add it to Git, chat, build arguments, or the URL.
+3. Add **`ALLOWED_ORIGINS`** with the exact ChatGPT web origin only if ChatGPT sends an `Origin` header. Start with `https://chatgpt.com`; add `https://chat.openai.com` only if that is the origin your connection uses. Separate origins with commas. Leave this unset otherwise.
+4. Deploy from the Vercel dashboard. Vercel recognizes the default Express export in `src/server.js`; no keep-alive schedule or Docker service is needed. `VERCEL_URL` and `VERCEL_PROJECT_PRODUCTION_URL` are accepted automatically for Host validation. For a custom domain, add its exact hostname to `ALLOWED_HOSTS`.
+5. Open the deployment's `/health` URL; expect `{"status":"ok"}`. A `503` means the server-side key was not configured for that deployment. The MCP endpoint is the same deployment URL ending in **`/mcp`**.
+
+Do not configure `TYPESAFE_ENDPOINT`: the only outbound inference endpoint is hard-coded to TypeSafe, and redirects are refused. The 60-second Vercel request cap applies to each HTTP invocation, not the total duration of the external shadow workflow. Hobby's current function limit is 300 seconds with Fluid Compute, so this service's 20-second upstream deadline leaves headroom; verify current plan limits before changing that timeout.
 
 **Access model:** this minimal version uses MCP **No authentication**. Anyone able to reach the endpoint can submit evidence and consume your TypeSafe quota. It is not a private authenticated service. The app limits classification attempts globally to 60 per rolling hour and two concurrently, per process; the limit resets on restart and is not a durable billing cap. Keep one instance. Use a TypeSafe spending limit if available. Add a standards-compatible OAuth layer before using it as a private multi-user service. Do not put an API key in the URL as a substitute for authentication.
 
 ## Connect the deployed service to ChatGPT
 
-Current connection instructions, checked September 25, 2026:
+Current connection instructions, checked September 25, 2026. Custom MCP app availability depends on plan and workspace policy. OpenAI currently supports full MCP app creation on Business and Enterprise/Edu; Pro users can connect read/fetch-only MCPs in developer mode. This server exposes only a read-only tool. See [OpenAI's current availability and setup instructions](https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt).
 
-1. In ChatGPT, open **Settings → Security and login → Developer mode** and enable it. Availability depends on your account and workspace policy.
-2. Open [ChatGPT Plugins](https://chatgpt.com/plugins), select **+**, and name the connection **Jev Classifier**.
+1. In ChatGPT web, open **Settings → Security and login** and enable **Developer mode**. Depending on your plan/workspace, the control may be under **Settings → Apps → Advanced settings** or **Workspace settings → Apps → Create**; an administrator may need to enable it.
+2. Open **Settings → Apps → Create** (or **Workspace settings → Apps → Create**) and create an app named **Jev Classifier**.
 3. Enter the description: **Read-only classification of supplied stock-decline evidence using Jev.**
-4. Under **Connection**, choose the public remote endpoint and paste the actual HTTPS URL ending in `/mcp`.
-5. If prompted for authentication, select **No authentication**. Do not provide your TypeSafe key to ChatGPT; it stays in Render.
-6. Create the connection. Confirm discovery shows exactly **`jev_classify`**, marked read-only.
-7. Start a new conversation, enable the connection in the tools menu, and ask: **Use jev_classify with the synthetic evidence packet in the README. Show the Jev model, primary catalyst, confidence, full probabilities, and all eight Noul values.** Include that packet in the message.
-8. After changing tool metadata, deploy, open the connection, select **Refresh**, and test in a new conversation.
+4. Paste the deployed HTTPS MCP endpoint ending in `/mcp`. When prompted for authentication, select **No authentication**.
+5. Select **Scan Tools**. Confirm that the only discovered action is **`jev_classify`** and that it is read-only, then create/save the app.
+6. Start a new chat, select **Jev Classifier** from the tools/apps menu, and ask it to classify the synthetic example packet in this README. Request the model, primary catalyst, confidence, full probabilities, and all eight Noul values.
+7. After changing tool metadata, redeploy and use the app's **Refresh** action before retesting.
+
+Do not provide the TypeSafe key to ChatGPT; it stays in Vercel. The deployed endpoint is public and has no OAuth authentication in this minimal version. Anyone who discovers the URL can submit requests against your TypeSafe quota; the in-memory hourly limiter is not a durable global quota on a serverless host. Do not use this publicly until you are comfortable with that exposure or add authentication and a durable rate limit.
 
 If connection fails, use `npx @modelcontextprotocol/inspector@latest`, choose Streamable HTTP, and enter the deployed `/mcp` URL. A browser visiting `/mcp` gets 405; that alone is not a failure. A 503 at `/health` means the environment key is absent, not that ChatGPT is broken. A 403 means the host or browser Origin is not allowed. A healthy endpoint with a classification error may indicate an invalid key, exhausted quota, timeout, or invalid upstream output. Provider error bodies are intentionally withheld.
 
@@ -141,5 +142,6 @@ The 20-second upstream deadline includes response-body reading. Request bodies a
 - [TypeSafe HTTP API](https://docs.typesafe.ai/api): endpoint, question and answer schemas.
 - [Official MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk/tree/v1.x): Streamable HTTP transport.
 - [OpenAI: connect and test your plugin](https://developers.openai.com/plugins/deploy/connect-chatgpt): current ChatGPT connection and refresh steps.
-- [Render Blueprint reference](https://render.com/docs/blueprint-spec): service configuration and secret prompts.
-- [Render default environment variables](https://render.com/docs/environment-variables): runtime port and external hostname.
+- [Vercel Express guide](https://vercel.com/docs/frameworks/backend/express): default app export and serverless behavior.
+- [Vercel Function limits](https://vercel.com/docs/functions/limitations): request-duration limits by plan.
+- [Vercel MCP deployment](https://vercel.com/docs/mcp/deploy-mcp-servers-to-vercel): remote MCP guidance.

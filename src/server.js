@@ -5,7 +5,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { createClassifier, SafeError } from './classifier.js';
 import { inputSchema, outputSchema } from './schemas.js';
 
-export function createApp({ apiKey = process.env.TYPESAFE_API_KEY?.trim(), fetchImpl, allowedHosts = ['localhost', '127.0.0.1'], classifierOptions = {} } = {}) {
+export function createApp({ apiKey = process.env.TYPESAFE_API_KEY?.trim(), fetchImpl, allowedHosts = ['localhost', '127.0.0.1'], allowedOrigins, classifierOptions = {} } = {}) {
   const classify = createClassifier({ apiKey, fetchImpl, ...classifierOptions });
   const app = express();
   app.disable('x-powered-by');
@@ -16,7 +16,8 @@ export function createApp({ apiKey = process.env.TYPESAFE_API_KEY?.trim(), fetch
     if (request.headers.origin) {
       try {
         const origin = new URL(request.headers.origin);
-        if (!['http:', 'https:'].includes(origin.protocol) || !allowedHosts.includes(origin.hostname)) {
+        const allowed = allowedOrigins || allowedHosts.flatMap(host => [`http://${host}`, `https://${host}`]);
+        if (!['http:', 'https:'].includes(origin.protocol) || !allowed.includes(origin.origin)) {
           return response.status(403).json({ error: 'Origin not allowed.' });
         }
       } catch {
@@ -64,9 +65,25 @@ export function createApp({ apiKey = process.env.TYPESAFE_API_KEY?.trim(), fetch
   return app;
 }
 
+function configuredHosts() {
+  return [
+    'localhost',
+    '127.0.0.1',
+    process.env.VERCEL_URL,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL,
+    ...(process.env.ALLOWED_HOSTS || '').split(',').map(host => host.trim()),
+  ].filter(Boolean);
+}
+
+function configuredOrigins() {
+  const origins = (process.env.ALLOWED_ORIGINS || '').split(',').map(origin => origin.trim()).filter(Boolean);
+  return origins.length ? origins : undefined;
+}
+
+const app = createApp({ allowedHosts: configuredHosts(), allowedOrigins: configuredOrigins() });
+export default app;
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const hosts = ['localhost', '127.0.0.1', process.env.RENDER_EXTERNAL_HOSTNAME, ...(process.env.ALLOWED_HOSTS || '').split(',')].filter(Boolean);
-  const app = createApp({ allowedHosts: hosts });
   const server = app.listen(Number(process.env.PORT || 3000), process.env.HOST || '127.0.0.1');
   server.requestTimeout = 30000;
   server.headersTimeout = 10000;
